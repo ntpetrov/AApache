@@ -1,0 +1,58 @@
+#!/bin/sh
+echo "Enter username: "
+read user
+echo "Enter domain: "
+read domain
+if [ -z "$user" ] || [ -z "$domain" ]; then
+echo "User or Domain is empty"
+echo "Exiting...."
+sleep 1
+fi
+getent passwd $user > /dev/null
+
+if [ $? -eq 0 ]; then
+    echo "The user exists!!!"
+	if [ -d "/var/www/$user" ]; then
+  		echo "Home directory /var/www/$user also exist!!!"
+		echo ""
+		echo "Do you want to add a subdomain? (Y/N): "
+		read ans
+	if [ "$ans" = "y" ] || [ "$ans" = "Y" ]; then
+		. /root/scripts/subdomain.sh
+	else
+		echo "Exiting...."
+	fi
+	fi
+exit 1
+else
+	echo ""
+	echo "Preparing $user home directory...."
+	echo ""
+
+useradd -b /var/www -d /var/www/$user -m -k /etc/skel -s /bin/false $user
+chmod 755 /var/www/$user
+chmod 755 /var/www/$user/cgi-bin/php.fcgi
+cp /etc/httpd/conf.d/template /etc/httpd/conf.d/hosts/$domain.conf
+replace DOMAIN $domain -- /etc/httpd/conf.d/hosts/$domain.conf
+replace USER $user -- /etc/httpd/conf.d/hosts/$domain.conf
+replace USER $user -- /var/www/$user/cgi-bin/php.fcgi
+echo "Please enter your password: "
+read -s pass
+echo "$pass" | passwd --stdin $user
+echo ""
+
+echo ""
+echo "Restarting apache........."
+service httpd restart
+chown -R $user.$user /var/www/$user
+fi
+
+echo "Do you want to configure database for this user? (Y/N)"
+read answer
+
+if [ "$answer" = "y" ] || [ "$answer" = "Y"] ; then
+. /root/scripts/mysql_exec.sh
+else
+	echo "Hasta pronto!"
+	exit 0
+fi 
